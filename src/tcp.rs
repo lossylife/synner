@@ -17,7 +17,9 @@ pub mod packet {
     use self::pnet_datalink::{Channel, NetworkInterface, MacAddr};
 
     pub struct PartialTCPPacketData<'a> {
+        pub destination_mac: MacAddr,
         pub destination_ip: Ipv4Addr,
+        pub destination_port: u16,
         pub iface_ip: Ipv4Addr,
         pub iface_name: &'a String,
         pub iface_src_mac: &'a MacAddr,
@@ -32,7 +34,7 @@ pub mod packet {
         {
             let mut eth_header = MutableEthernetPacket::new(&mut tmp_packet[..ETHERNET_HEADER_LEN]).unwrap();
 
-            eth_header.set_destination(MacAddr::broadcast());
+            eth_header.set_destination(partial_packet.destination_mac);
             eth_header.set_source(*partial_packet.iface_src_mac);
             eth_header.set_ethertype(EtherTypes::Ipv4);
         }
@@ -58,8 +60,8 @@ pub mod packet {
         {
             let mut tcp_header = MutableTcpPacket::new(&mut tmp_packet[(ETHERNET_HEADER_LEN + IPV4_HEADER_LEN)..]).unwrap();
 
-            tcp_header.set_source(rand::random::<u16>());
-            tcp_header.set_destination(rand::random::<u16>());
+            tcp_header.set_source(1999);
+            tcp_header.set_destination(partial_packet.destination_port);
 
             tcp_header.set_flags(TcpFlags::SYN);
             tcp_header.set_window(64240);
@@ -74,7 +76,7 @@ pub mod packet {
         }
     }
 
-    pub fn send_tcp_packets(destination_ip: Ipv4Addr, interface: String, count: u32) {
+    pub fn send_tcp_packets(destination_mac: MacAddr, destination_ip: Ipv4Addr, destination_port: u16, interface: String, count: u32) {
         let interfaces = pnet_datalink::interfaces();
 
         println!("List of Available Interfaces\n");
@@ -101,27 +103,26 @@ pub mod packet {
         };
 
         let partial_packet: PartialTCPPacketData = PartialTCPPacketData {
+            destination_mac: destination_mac,
             destination_ip: destination_ip,
+            destination_port: destination_port,
             iface_ip,
             iface_name: &interface.name,
             iface_src_mac: &interface.mac.unwrap(),
         };
 
-        let (mut tx, _) = match pnet_datalink::channel(&interface, Default::default()) {
+        let mut config: pnet_datalink::Config = Default::default();
+        config.qdisc_bypass = true;
+        let (mut tx, _) = match pnet_datalink::channel(&interface,config) {
             Ok(Channel::Ethernet(tx, rx)) => (tx, rx),
             Ok(_) => panic!("Unknown channel type"),
             Err(e) => panic!("Error happened {}", e),
         };
 
+        let mut packet = vec![0; 66];
+        build_random_packet(&partial_packet, packet.as_mut());
         for i in 0..count {
-
-            if &i % 10000 == 0 {
-                println!("Sent {:?} packets", &i);
-            }
-
-            tx.build_and_send(1, 66, &mut |packet: &mut [u8]| {
-                build_random_packet(&partial_packet, packet);
-            });
+            tx.send_to(&packet[0..66], None);
         }
     }
 }
