@@ -7,6 +7,7 @@ extern crate pnet_datalink;
 extern crate pnet_transport;
 
 use synner::tcp::packet::{send_tcp_packets};
+use self::pnet_datalink::{MacAddr};
 
 use std::env;
 use std::net::{Ipv4Addr};
