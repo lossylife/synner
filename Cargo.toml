@@ -17,4 +17,4 @@ pnet_transport = "0.25.0"
 rand = "0.3.15"
 
 [patch.crates-io]
-pnet = { git = "https://github.com/lossylife/synner", branch = "feature/maxium" }
+pnet = { git = "https://github.com/lossylife/libpnet", branch = "feature/maxium" }
